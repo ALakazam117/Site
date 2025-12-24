@@ -6,22 +6,38 @@ const jwt = require('jsonwebtoken');
 const bodyParser = require('body-parser');
 
 const app = express();
-const PORT = 5000;
-const SECRET_KEY = 'super_secret_key_silentcore'; // Change this in production
+
+// ----------------------------------------------------
+// CRITICAL FIX 1: Use the Port Render gives us
+// ----------------------------------------------------
+const PORT = process.env.PORT || 5000; 
+
+const SECRET_KEY = 'super_secret_key_silentcore'; 
 
 // Middleware
-app.use(cors());
+// ----------------------------------------------------
+// CRITICAL FIX 2: explicit CORS to allow your store
+// ----------------------------------------------------
+app.use(cors({
+    origin: '*', // Allows all websites (simplest for now)
+    methods: ['GET', 'POST']
+}));
 app.use(bodyParser.json());
 
-// 1. Connect to MongoDB (You need a local DB or MongoDB Atlas URL)
-// For testing, if you have MongoDB installed locally: 'mongodb://localhost:27017/silentstore'
-// Or use a free Atlas URL.
-const dbURI = process.env.MONGO_URI || 'mongodb://localhost:27017/silentstore';
+// ----------------------------------------------------
+// CRITICAL FIX 3: Use the Database Link from Render
+// ----------------------------------------------------
+const dbURI = process.env.MONGO_URI;
 
-mongoose.connect(dbURI)
-  .then(() => console.log('MongoDB Connected'))
-  .catch(err => console.log('DB Connection Error:', err));
-// 2. Create User Schema (Database Blueprint)
+if (!dbURI) {
+    console.error("ERROR: MONGO_URI is missing. Check Render Environment Variables.");
+}
+
+mongoose.connect(dbURI || 'mongodb://localhost:27017/silentstore')
+  .then(() => console.log('✅ MongoDB Connected Successfully'))
+  .catch(err => console.log('❌ DB Connection Error:', err));
+
+// Database Schema
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
     password: { type: String, required: true }
@@ -29,21 +45,21 @@ const UserSchema = new mongoose.Schema({
 
 const User = mongoose.model('User', UserSchema);
 
-// 3. Register Route
+// Register Route
 app.post('/register', async (req, res) => {
     try {
         const { username, password } = req.body;
-        // Hash the password so it's secure
         const hashedPassword = await bcrypt.hash(password, 10);
         const newUser = new User({ username, password: hashedPassword });
         await newUser.save();
         res.status(201).json({ message: 'User created successfully' });
     } catch (error) {
-        res.status(500).json({ error: 'Error creating user' });
+        console.error("Register Error:", error);
+        res.status(500).json({ error: 'Error creating user (Duplicate name?)' });
     }
 });
 
-// 4. Login Route
+// Login Route
 app.post('/login', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -53,7 +69,6 @@ app.post('/login', async (req, res) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) return res.status(400).json({ error: 'Invalid credentials' });
 
-        // Create a "token" (like a digital VIP pass)
         const token = jwt.sign({ userId: user._id }, SECRET_KEY, { expiresIn: '1h' });
         res.json({ token, username: user.username });
     } catch (error) {
@@ -61,6 +76,7 @@ app.post('/login', async (req, res) => {
     }
 });
 
+// Start Server
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
