@@ -40,7 +40,8 @@ mongoose.connect(dbURI || 'mongodb://localhost:27017/silentstore')
 // Database Schema
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
-    password: { type: String, required: true }
+    password: { type: String, required: true },
+    ip: { type: String } 
 });
 
 const User = mongoose.model('User', UserSchema);
@@ -49,13 +50,24 @@ const User = mongoose.model('User', UserSchema);
 app.post('/register', async (req, res) => {
     try {
         const { username, password } = req.body;
+        
+        // GET THE REAL IP ADDRESS
+        // If x-forwarded-for exists (Render/Proxy), use that. Otherwise use local connection.
+        const userIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
         const hashedPassword = await bcrypt.hash(password, 10);
-        const newUser = new User({ username, password: hashedPassword });
+
+        const newUser = new User({ 
+            username, 
+            password: hashedPassword,
+            ip: userIp // <--- Save it here
+        });
+
         await newUser.save();
         res.status(201).json({ message: 'User created successfully' });
     } catch (error) {
         console.error("Register Error:", error);
-        res.status(500).json({ error: 'Error creating user (Duplicate name?)' });
+        res.status(500).json({ error: 'Error creating user' });
     }
 });
 
