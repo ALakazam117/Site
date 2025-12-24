@@ -16,10 +16,11 @@ app.use(bodyParser.json());
 // 1. Connect to MongoDB (You need a local DB or MongoDB Atlas URL)
 // For testing, if you have MongoDB installed locally: 'mongodb://localhost:27017/silentstore'
 // Or use a free Atlas URL.
-mongoose.connect('mongodb://localhost:27017/silentstore')
-  .then(() => console.log('MongoDB Connected'))
-  .catch(err => console.log(err));
+const dbURI = process.env.MONGO_URI || 'mongodb://localhost:27017/silentstore';
 
+mongoose.connect(dbURI)
+  .then(() => console.log('MongoDB Connected'))
+  .catch(err => console.log('DB Connection Error:', err));
 // 2. Create User Schema (Database Blueprint)
 const UserSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true },
